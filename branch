@@ -1,0 +1,306 @@
+--[[
+
+	Turtle Script, Branch Mine
+	Author: Bisa
+		
+]]--
+
+local arg = { ... }
+
+term.clear()
+term.setCursorPos(1, 1)
+
+print("Peek holes per branch:")
+local num_sections = tonumber(read()) or 10
+
+print("Number of branch pairs:")
+local num_branches = tonumber(read()) or 1
+
+print("Create main tunnel? Y/N:")
+local main_tunnel = read()
+if main_tunnel == 'Y' or main_tunnel == 'y' then
+	main_tunnel = true
+else
+	main_tunnel = false
+end
+
+local min_empty = 1			-- The least amount of free slots before inv is regarded as full
+
+local FUEL  = 1
+local TORCH = 2
+local CHEST = 3
+local FREE  = 4
+
+function debug_info(msg)
+	--print(msg)
+end
+
+function move(dir, steps, tunnel)
+	dir = dir or 'f'
+	steps = steps or 1
+	
+	local action = {
+		['f'] = function() return turtle.forward() end,
+		['d'] = function() return turtle.down() end,
+		['u'] = function() return turtle.up() end,
+	}
+	
+	for i=1,steps do
+		refuel()
+		if math.rand(10) > 8 then		-- Try to unload items every few moves
+			chest()
+		end
+		while not action[dir]() do
+			debug_info('Failed to move!')
+			refuel()
+			if detect(dir) then
+				debug_info('Breaking blocks to get through!')
+				dig(dir)
+			else
+				debug_info('Attacking entity to get through!')
+				attack(dir)
+			end
+		end
+		if tunneling or tunnel then
+			dig('u')
+			dig('d')
+		end
+	end
+end
+
+function up(steps)
+	steps = steps or 1
+	move('u', steps)
+end
+
+function down(steps)
+	steps = steps or 1
+	move('d', steps)
+end
+
+function forward(steps, tunnel)
+	steps = steps or 1
+	move('f', steps, tunnel)
+end
+
+function back(steps)
+	steps = steps or 1
+	turtle.turnLeft()
+	turtle.turnLeft()
+	forward(steps)
+end
+
+function left(steps)
+	steps = steps or 1
+	goingleft = true
+	turtle.turnLeft()
+	forward(steps)
+	goingleft = false
+end
+
+function right(steps)
+	steps = steps or 1
+	goingright = true
+	turtle.turnRight()
+	forward(steps)
+	goingright = false
+end
+
+function detect(dir)
+	dir = dir or 'f'		-- Default to detecting forward
+	local action = {
+		['f'] = function() return turtle.detect() end,
+		['u'] = function() return turtle.detectUp() end,
+		['d'] = function() return turtle.detectDown() end,
+		
+		['r'] = function() turtle.turnRight() local result=detect() turtle.turnLeft() return result end,
+		['l'] = function() turtle.turnLeft() local result=detect() turtle.turnRight() return result end,
+	}
+	
+	return action[dir]()
+end
+
+function dig(dir)
+	dir = dir or 'f'		-- Default to digging forward
+	digging = true
+	refuel()
+	
+	local action = {
+		['f'] = function() turtle.dig() end,
+		['u'] = function() turtle.digUp() end,
+		['d'] = function() turtle.digDown() end,
+		
+		['r'] = function() turtle.turnRight() dig() turtle.turnLeft() end,
+		['l'] = function() turtle.turnLeft() dig() turtle.turnRight() end,
+	}
+	
+	while detect(dir) do
+		refuel()
+		action[dir]()
+	end
+	
+	digging = false
+end
+
+function attack(dir)
+	dir = dir or 'f'		-- Default to digging forward
+	attacking = true
+	refuel()
+	local action = {
+		['f'] = function() turtle.attack() end,
+		['u'] = function() turtle.attackUp() end,
+		['d'] = function() turtle.attackDown() end,
+	}
+	
+	action[dir]()
+	attacking = false
+end
+
+function peek()
+	-- Creates a peek hole 5 deep on either side of the turtle
+	-- before returning to the original position
+	peeking = true
+	refuel()
+	left(4)	dig() back(8) dig() back(4) turtle.turnRight()
+	peeking = false
+end
+
+function peek_advance()
+	-- For lack of a better name, this advances the turtle to
+	-- the next peek position
+	peek_advancing = true
+	for i=1,4 do
+		forward()
+		dig('d')
+	end
+	peek_advancing = false
+end
+
+function torch()
+	torching = true
+	refuel()
+	turtle.select(TORCH)
+	turtle.placeDown()
+	torching = false
+end
+
+function unload()
+	-- Take a step backwards, place a chest and drop our items in it
+	unloading = true
+	back()
+	down()
+	dig('d')
+	turtle.select(CHEST)
+	if turtle.placeDown() then
+		drop()
+	end
+	up()
+	back()
+	unloading = false
+end
+
+function full_inv()
+	-- Makes a simple check to determine inventory status
+	local empty = 0
+	for i=FREE,16 do
+		if turtle.getItemCount(i) == 0 then
+			empty = empty + 1
+			if empty >= min_empty then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+function drop(dir)
+	dir = dir or 'd'	-- Default to emptying inventory below turtle
+	dropping = true
+	local action = {
+		['d'] = function() turtle.dropDown() end,
+		['u'] = function() turtle.dropUp() end,
+		['s'] = function() turtle.drop() end,	-- Drop to any side (back, front, left or right)
+	}
+	for i=FREE,16 do
+		turtle.select(i)
+		action[dir]()
+	end
+	dropping = false
+end
+
+function chest()
+	if not peeking and full_inv() and turtle.getItemCount(CHEST) > 0 then
+		unload()
+	end
+end
+
+function refuel()
+	-- This beast is designed to run on coal
+	if turtle.getFuelLevel() < 0 then
+		turtle.select(FUEL)
+		return turtle.refuel(turtle.getItemCount(FEUL)-1)
+	end	
+	return true
+end
+
+function branch_return()
+	back(num_sections * 4)
+end
+
+function tunnel(count)
+	count = count or 1
+	
+	tunneling = true
+	for i=1,count do
+		if main_tunnel then
+			forward()	
+			right()
+			forward()
+			left()
+			left()
+			forward()
+			turtle.turnRight()
+		else
+			forward(2)
+		end
+		if i % 5 == 0 then
+			torch()
+		end
+	end
+	tunneling = false
+end
+
+function branch(continue)
+	for i=1,num_sections do
+		peek_advance() 		-- Move forward
+		if i % 2 ~= 0 then 	-- Place a torch every 2 sections
+			torch()
+		end
+		peek() 				-- Create the peek holes
+	end
+	branch_return()
+	forward(2, true)
+	if continue then 		-- Continue on the other side
+		branch(false)
+		turtle.turnRight()
+	end
+end
+
+-- START
+
+tunnel(4)					-- Initial tunneling
+for i=1,num_branches do
+	print('Starting branch pair ' .. i .. '/' .. num_branches)
+	turtle.turnLeft()		-- Branches always start on the left side
+	branch(true)
+	if i < num_branches then
+		tunnel(6)			-- We've got more to dig, carry on!
+	else
+		tunnle(2)			-- Add 2 extra at the end, in case we want to
+							-- continue here another time
+	end
+end
+
+-- Return the turtle to where it started
+back((num_branches * 12) + 9)
+back()
