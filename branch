@@ -1,10 +1,3 @@
---[[
-
-	Turtle Script, Branch Mine
-	Author: Bisa
-		
-]]--
-
 local arg = { ... }
 
 term.clear()
@@ -47,7 +40,7 @@ function move(dir, steps, tunnel)
 	
 	for i=1,steps do
 		refuel()
-		if math.rand(10) > 8 then		-- Try to unload items every few moves
+		if math.random(10) > 8 then		-- Try to unload items every few moves
 			chest()
 		end
 		while not action[dir]() do
@@ -236,9 +229,9 @@ end
 
 function refuel()
 	-- This beast is designed to run on coal
-	if turtle.getFuelLevel() < 0 then
+	if turtle.getFuelLevel() <= 20 then
 		turtle.select(FUEL)
-		return turtle.refuel(turtle.getItemCount(FEUL)-1)
+		return turtle.refuel(1)
 	end	
 	return true
 end
@@ -276,7 +269,7 @@ function branch(continue)
 		if i % 2 ~= 0 then 	-- Place a torch every 2 sections
 			torch()
 		end
-		peek() 				-- Create the peek holes
+		peek() 			-- Create the peek holes
 	end
 	branch_return()
 	forward(2, true)
@@ -288,16 +281,16 @@ end
 
 -- START
 
-tunnel(4)					-- Initial tunneling
+tunnel(4)				-- Initial tunneling
 for i=1,num_branches do
 	print('Starting branch pair ' .. i .. '/' .. num_branches)
 	turtle.turnLeft()		-- Branches always start on the left side
 	branch(true)
 	if i < num_branches then
-		tunnel(6)			-- We've got more to dig, carry on!
+		tunnel(6)		-- We've got more to dig, carry on!
 	else
-		tunnle(2)			-- Add 2 extra at the end, in case we want to
-							-- continue here another time
+		tunnel(2)		-- Add 2 extra at the end, in case we want to
+					-- continue here another time
 	end
 end
 
