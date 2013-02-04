@@ -222,6 +222,7 @@ function drop(dir)
 end
 
 function chest()
+	-- TODO: The turtle behaves unexpectedly if it has no chests, debug and fix
 	if not peeking and full_inv() and turtle.getItemCount(CHEST) > 0 then
 		unload()
 	end
@@ -295,5 +296,5 @@ for i=1,num_branches do
 end
 
 -- Return the turtle to where it started
-back((num_branches * 12) + 9)
+back(num_branches * 12)
 back()
