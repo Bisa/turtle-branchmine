@@ -24,6 +24,9 @@ local TORCH = 2
 local CHEST = 3
 local FREE  = 4
 
+local num_chests = turtle.getItemCount(CHEST)
+local unloadfails = 0
+
 function debug_info(msg)
 	--print(msg)
 end
@@ -40,9 +43,9 @@ function move(dir, steps, tunnel)
 	
 	for i=1,steps do
 		refuel()
-		if math.random(10) > 8 then		-- Try to unload items every few moves
-			chest()
-		end
+		--if math.random(10) > 8 then		-- Try to unload items every few moves
+		--	chest()
+		--end
 		while not action[dir]() do
 			debug_info('Failed to move!')
 			refuel()
@@ -136,7 +139,7 @@ function dig(dir)
 end
 
 function attack(dir)
-	dir = dir or 'f'		-- Default to digging forward
+	dir = dir or 'f'		-- Default to attacking forward
 	attacking = true
 	refuel()
 	local action = {
@@ -171,25 +174,26 @@ end
 
 function torch()
 	torching = true
-	refuel()
 	turtle.select(TORCH)
 	turtle.placeDown()
 	torching = false
 end
 
 function unload()
-	-- Take a step backwards, place a chest and drop our items in it
+	-- Place a chest and drop our items in it
 	unloading = true
-	back()
-	down()
+	local unloded = false
+    down()
 	dig('d')
 	turtle.select(CHEST)
 	if turtle.placeDown() then
 		drop()
+		unloaded = true
+		num_chests = num_chests - 1
 	end
 	up()
-	back()
 	unloading = false
+	return unloaded
 end
 
 function full_inv()
@@ -223,9 +227,10 @@ end
 
 function chest()
 	-- TODO: The turtle behaves unexpectedly if it has no chests, debug and fix
-	if not peeking and full_inv() and turtle.getItemCount(CHEST) > 0 then
-		unload()
+	if not peeking and num_chests > 0 then
+		return unload()
 	end
+	return false
 end
 
 function refuel()
@@ -277,6 +282,16 @@ function branch(continue)
 	if continue then 		-- Continue on the other side
 		branch(false)
 		turtle.turnRight()
+	end
+	
+	if not chest() then
+		unloadfails = unloadfails + 1
+	end
+	if unloadfails > 3 then
+		print("Failed to unload cargo more then 3 times, aborting!")
+		while true do
+			turtle.turnLeft()
+		end
 	end
 end
 
