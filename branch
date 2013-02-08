@@ -1,7 +1,26 @@
 local arg = { ... }
 
+local min_empty = 1			-- The least amount of free slots before inv is regarded as full
+
+local FUEL  = 1
+local TORCH = 2
+local CHEST = 3
+local FREE  = 4
+
+local num_chests = turtle.getItemCount(CHEST)
+local unloadfails = 0
+
 term.clear()
 term.setCursorPos(1, 1)
+
+print('Did you put chests in slot nr ' .. CHEST .. '? Y/N:')
+local has_chests = read()
+if has_chests == 'Y' or has_chests == 'y' then
+	print('Good, but please note that sadly I cannot be refilled (yet..)')
+else
+	print('Unable to work without chests, please give me some!')
+	exit()
+end
 
 print("Peek holes per branch:")
 local num_sections = tonumber(read()) or 10
@@ -17,15 +36,10 @@ else
 	main_tunnel = false
 end
 
-local min_empty = 1			-- The least amount of free slots before inv is regarded as full
-
-local FUEL  = 1
-local TORCH = 2
-local CHEST = 3
-local FREE  = 4
-
-local num_chests = turtle.getItemCount(CHEST)
-local unloadfails = 0
+function exit()
+	-- Just call something nil, ugly but works :p
+	nothing.nofunctionhere()
+end
 
 function debug_info(msg)
 	--print(msg)
@@ -43,9 +57,9 @@ function move(dir, steps, tunnel)
 	
 	for i=1,steps do
 		refuel()
-		--if math.random(10) > 8 then		-- Try to unload items every few moves
-		--	chest()
-		--end
+		if math.random(10) > 8 then		-- Try to unload items every few moves
+			chest()
+		end
 		while not action[dir]() do
 			debug_info('Failed to move!')
 			refuel()
@@ -179,23 +193,6 @@ function torch()
 	torching = false
 end
 
-function unload()
-	-- Place a chest and drop our items in it
-	unloading = true
-	local unloaded = false
-    down()
-	dig('d')
-	turtle.select(CHEST)
-	if turtle.placeDown() then
-		drop()
-		unloaded = true
-		num_chests = num_chests - 1
-	end
-	up()
-	unloading = false
-	return unloaded
-end
-
 function full_inv()
 	-- Makes a simple check to determine inventory status
 	local empty = 0
@@ -225,12 +222,34 @@ function drop(dir)
 	dropping = false
 end
 
+-- TODO: Have the turtle return to a drop off location?
 function chest()
-	-- TODO: The turtle behaves unexpectedly if it has no chests, debug and fix
-	if not peeking and num_chests > 0 then
-		return unload()
+	
+	-- Stop if turtle fails to unload to many times (we lose a lot of items otherwise!)
+	if unloadfails > 5 then
+		print("Failed to unload cargo more then 5 times, aborting!")
+		exit()
 	end
-	return false
+
+	local unloaded = false
+	if full_inv() and not peeking and num_chests > 0 then
+		-- Place a chest and drop our items in it
+		unloading = true
+		down()
+		dig('d')
+		turtle.select(CHEST)
+		if turtle.placeDown() then
+			drop()
+			unloaded = true
+			num_chests = num_chests - 1
+		end
+		up()
+		unloading = false
+	end
+	if  full_inv() and not unloaded and not peeking then
+		unloadfails = unloadfails + 1
+	end
+	return unloaded
 end
 
 function refuel()
@@ -282,16 +301,6 @@ function branch(continue)
 	if continue then 		-- Continue on the other side
 		branch(false)
 		turtle.turnRight()
-	end
-	
-	if not chest() then
-		unloadfails = unloadfails + 1
-	end
-	if unloadfails > 3 then
-		print("Failed to unload cargo more then 3 times, aborting!")
-		while true do
-			turtle.turnLeft()
-		end
 	end
 end
 
