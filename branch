@@ -182,7 +182,7 @@ end
 function unload()
 	-- Place a chest and drop our items in it
 	unloading = true
-	local unloded = false
+	local unloaded = false
     down()
 	dig('d')
 	turtle.select(CHEST)
